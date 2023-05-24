@@ -261,8 +261,6 @@ while True:
             elif (x < 0.06 * maxx) and (y < 0.07 * maxy):
                 if numlock:
                     brightness = change_brightness(brightness)
-                else:
-                    launch_calculator()
                 continue
 
             # If touchpad mode, ignore #
