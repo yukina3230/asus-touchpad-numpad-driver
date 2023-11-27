@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from fcntl import F_SETFL, fcntl
 from time import sleep
 from typing import Optional
@@ -123,7 +124,6 @@ d_k = Device(fd_k)
 # KEY_APOSTROPHE:40
 # [...]
 percentage_key = EV_KEY.KEY_5
-calculator_key = EV_KEY.KEY_CALC
 
 if len(sys.argv) > 2:
     percentage_key = EV_KEY.codes[int(sys.argv[2])]
@@ -132,7 +132,6 @@ dev = Device()
 dev.name = "Asus Touchpad/Numpad"
 dev.enable(EV_KEY.KEY_LEFTSHIFT)
 dev.enable(EV_KEY.KEY_NUMLOCK)
-dev.enable(calculator_key)
 
 for col in model_layout.keys:
     for key in col:
@@ -171,19 +170,6 @@ def deactivate_numlock():
     subprocess.call(numpad_cmd, shell=True)
 
 
-def launch_calculator():
-    try:
-        events = [
-            InputEvent(calculator_key, 1),
-            InputEvent(EV_SYN.SYN_REPORT, 0),
-            InputEvent(calculator_key, 0),
-            InputEvent(EV_SYN.SYN_REPORT, 0)
-        ]
-        udev.send_events(events)
-    except OSError as e:
-        pass
-
-
 # status 1 = min bright
 # status 2 = middle bright
 # status 3 = max bright
@@ -201,6 +187,10 @@ pos_x: int = 0
 pos_y: int = 0
 button_pressed: libevdev.const = None
 brightness: int = 0
+
+# Track tap count and time of last tap
+tap_count = 0
+last_tap_time = 0
 
 while True:
     # If touchpad sends tap events, convert x/y position to numlock key and send it #
@@ -246,18 +236,30 @@ while True:
 
         elif e.value == 1 and not button_pressed:
             # Start of tap #
+            current_time = time.time()
             log.debug('finger down at x %d y %d', x, y)
 
+            # Check if the tap is within the double tap time window
+            if current_time - last_tap_time <= 0.5:
+                # Increment tap count if it's a double tap
+                tap_count += 1
+            else:
+                # Reset tap count if it's been too long since the last tap
+                tap_count = 1
+
+            last_tap_time = current_time
+
             # Check if numlock was hit #
-            if (x > 0.95 * maxx) and (y < 0.09 * maxy):
+            if (x > 0.95 * maxx) and (y < 0.09 * maxy) and tap_count == 2:
                 numlock = not numlock
                 if numlock:
                     activate_numlock(brightness)
                 else:
                     deactivate_numlock()
+                tap_count = 0  # Reset tap count after double tap
                 continue
 
-            # Check if caclulator was hit #
+            # Check if brightness was hit #
             elif (x < 0.06 * maxx) and (y < 0.07 * maxy):
                 if numlock:
                     brightness = change_brightness(brightness)
