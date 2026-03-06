@@ -80,6 +80,10 @@ do
             model=ux581l
             break
             ;;
+        "ux3402za" )
+            model=ux3402za
+            break
+            ;;
         "Q")
             exit 0
             ;;
